@@ -1,134 +1,126 @@
 #include "transform.h"
 
-cmatrix makeTransMatrix (int n) {
-    int i, j;
-    cmatrix F = cinitmatrix(n,n);
-    for (i = 0; i < F.n; i++)
-        for (j = 0; j < F.m; j++)
-            F.row[i].col[j] = cexp (-2*pi*I/n*i*j);
-    return F;
+double timer () {
+    static clock_t start = 0;
+    static clock_t stop;
+    double change;
+
+    stop = clock();
+    change = (double)(stop - start)/CLOCKS_PER_SEC;
+    start = clock();
+    return change;
 }
 
-cmatrix makeRandomVector(int n) {
-    cmatrix A = cinitmatrix(n,1);
-    int i;
-    for (i = 0; i < A.n; i++)
-        A.row[i].col[0] = RAND_DBL*sin((double)i*6*pi/A.n);
-    return A;
-}
+void getArrayFromFile(FILE *f, gsl_vector_complex *dest, int n_points) {
+    int i, dum;
+    double data;
+    gsl_complex z;
 
-void printRealToStream(FILE *stream, cmatrix A) {
-    int i, j;
-    for (i = 0; i < A.n; i++) {
-        for (j = 0; j < A.m; j++) {
-            fprintf (stream, "%.*e ", DBL_DIG, creal(A.row[i].col[j]));
-        }
-        fprintf (stream, "\n");
+    for (i = n_points; i > 0; i--) {
+        fscanf (f, "%i,%lf", &dum, &data);
+        GSL_SET_COMPLEX(&z, data, 0);
+        gsl_vector_complex_set (dest, i-1, z);
     }
 }
 
-int cmpDouble(const void *pa, const void *pb) {
-    double a = *(double*)pa;
-    double b = *(double*)pb;
-
-    if (a > b)
-        return 1;
-    else if (a < b)
-        return -1;
-    else
-        return 0;
-}
-
-int cmpVectorElems(const void *pa, const void *pb) {
-    double a = cabs(((cRow*)pa)->col[0]);
-    double b = cabs(((cRow*)pb)->col[0]);
-
-    return cmpDouble(&a, &b);
-}
-
-cmatrix sortVector (cmatrix A) {
+void printArray(FILE *f, gsl_vector_complex *source, int n_points) {
     int i;
-    cmatrix S;
+    for (i = 0; i < n_points; i++)
+        fprintf (f, "%.*e\n", DBL_DIG, GSL_REAL(gsl_vector_complex_get(source, i)));
+}
 
-    S.n = A.n;
-    S.m = 1;
-    S.row = malloc(S.n*sizeof(cRow*));
-    for (i = 0; i < S.n; i++) {
-        S.row[i] = A.row[i];
+FILE *my_fopen(char *path, char *mode) {
+    FILE *f = fopen(path, mode);
+    if (f == NULL) {
+        printf ("Couldn't access %s for reading.\n", path);
+        exit(1);
     }
-
-    qsort(S.row, A.n, sizeof(cRow), cmpVectorElems);
-    return S;
+    return f;
 }
 
-void freeRowsCols (void *pA) {
-    cmatrix A = *(cmatrix*)pA;
+double getRMSError(gsl_vector_complex *a, gsl_vector_complex *b, int n_points) {
+    double a_val, b_val, sum = 0;
     int i;
-    for (i = 0; i < A.n; i++)
-        free(A.row[i].col);
-    free(A.row);
-}
-
-double getError(cmatrix A, cmatrix B) {
-    int i;
-    double error = 0;
-    for (i = 0; i < A.n; i++)
-        error += (A.row[i].col[0]-B.row[i].col[0])*(A.row[i].col[0]-B.row[i].col[0]);
-    return sqrt(fabs(error)/A.n);
-}
-
-cmatrix removeFrequencies (cmatrix s, double allowable_error) {
-    cmatrix F = makeTransMatrix(s.n); // Make the DSF matrix and inverse
-    cmatrix G = cscalematrix(conjugatematrix(cduplicatematrix(F)), 1.0/s.n);
-    cmatrix t = cmatrixmultiply(F,s,NULL); // Transform s into frequency domain
-    cmatrix w = cduplicatematrix(t);  // Copy it to w
-    cmatrix u = sortVector(w);        // Sort w
-    cmatrix v = cinitmatrix(s.n,1);
-    double error;
-    int i, j;
-    FILE *p = fopen("error", "w");
-
-    // Delete all but the first element
-    j = 1;
-    for(;;) {
-        for (i = 0; i < s.n - j; i++)
-            u.row[i].col[0] = 0;
-        v = cmatrixmultiply(G,w,&v); // Convert back to time domain
-        error = getError(s,v); // Check the error
-        fprintf(p, "%i %.*e\n", j, DBL_DIG, error);
-        //if (error > allowable_error) { // If the error is too big
-        if (j < s.n) { // I want error at each spot
-            j++; // Increase the number we keep
-            //freeRowsCols(&v); // Free v
-            for (i = 0; i < s.n; i++) // Reset w back to t
-                w.row[i].col[0] = t.row[i].col[0];
-        }
-        else // We're done
-            break;
+    for (i = 0; i < n_points; i++) {
+        a_val = GSL_REAL(gsl_vector_complex_get(a,i));
+        b_val = GSL_REAL(gsl_vector_complex_get(b,i));
+        sum += (a_val - b_val)*(a_val - b_val);
     }
-
-    freeRowsCols(&F);
-    freeRowsCols(&G);
-    freeRowsCols(&t);
-    printf ("Error with %i frequencies: %.*e.\n", j, DBL_DIG, error);
-    fclose(p);
-    return v;
+    return sqrt(sum/n_points);
 }
 
 int main(int argc, char **argv) {
-    //srand(time(NULL));
-    double r = (argc > 1) ? atof(argv[1]) : 1;
-    int n = 1000;
-    FILE *a = fopen ("original", "w");
-    FILE *b = fopen ("transformed", "w");
-    cmatrix s = makeRandomVector(n);
-    cmatrix t = removeFrequencies(s, r);
+    int i, n_points;
+    char o_name[] = "out";
+    FILE *input, *out, **dtft_out, **dft_out;
+    char buffer[100];
+    double time, error;
+    gsl_vector_complex *raw;
+    gsl_vector_complex *trans;
 
-    printRealToStream(a, s);
-    printRealToStream(b, t);
+    if (argc != 3) {
+        printf ("Usage: %s LINES FILE\n", argv[0]);
+        exit(1);
+    }
 
-    fclose(a);
-    fclose(b);
+    /* Get commandline args */
+    n_points = atoi(argv[1]);
+
+    /* Allocate memory */
+    //puts("Allocating memory.");
+    dft_out = malloc(4 * sizeof(FILE*));
+    dtft_out = malloc(4 * sizeof(FILE*));
+    raw = gsl_vector_complex_alloc(n_points);
+    trans = gsl_vector_complex_alloc(n_points);
+    if (dft_out == NULL || dtft_out == NULL) {
+        printf ("Couldn't allocate memory.\n");
+        exit(1);
+    }
+
+    /* Open files */
+    //puts("Opening files.");
+    input = my_fopen(argv[2], "r");
+    out = my_fopen(o_name, "w");
+    strcpy(buffer, o_name);
+    for (i = 0; i < 4; i++) {
+        sprintf(buffer, "%s.dft.%i", o_name, 2*i+1);
+        dft_out[i] = my_fopen(buffer, "w");
+        sprintf(buffer, "%s.dtft.%i", o_name, 2*i+1);
+        dtft_out[i] = my_fopen(buffer, "w");
+    }
+
+    /* Read in the raw data */
+    //puts("Reading in data.");
+    getArrayFromFile(input, raw, n_points);
+    printArray(out, raw, n_points);
+    //gsl_vector_complex_fprintf(stdout, raw, "%e");
+
+    /* Make the discrete tranforms */
+    for (i = 0; i < 4; i++) {
+        //printf ("Transforming with %i frequencies.\n", 2*i+1);
+        time = getDFTFromArray(trans, raw, n_points, 2*i+1);
+        error = getRMSError(raw, trans, n_points);
+        printf ("Got DFT with %i frequencies in %lf secs with error %e.\n", 2*i+1, time, error);
+        printArray(dft_out[i], trans, n_points);
+    }
+
+#ifdef DONOTCOMPILE
+    /* Make the discrete time series */
+    for (i = 0; i < 4; i++) {
+        time = getDTFTFromArray(trans, raw, n_points, 2*i+1);
+        error = getRMSError(raw, trans, n_points);
+        printf ("Got DTFT with %i frequencies in %lf secs with error %e.\n", 2*i+1, time, error);
+        printArray(dtft_out, trans, n_points);
+    }
+#endif
+
+    /* Close all files and free memory */
+    fclose(input);
+    fclose(out);
+    for (i = 0; i < 4; i++) {
+        fclose(dft_out[i]);
+        fclose(dtft_out[i]);
+    }
+
     exit(0);
 }
-

@@ -5,24 +5,26 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 #include <complex.h>
 #include <float.h>
 #include <time.h>
-#include "cmatrix.h"
+#include <gsl/gsl_blas.h>
+#include <gsl/gsl_complex_math.h>
+#include <gsl/gsl_permutation.h>
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_sort_vector.h>
 
 #define pi 3.1415926535897932384626433
 #define RAND_DBL ((double)rand()/(RAND_MAX+1.0))
 
-cmatrix makeTransMatrix (int n);
-cmatrix makeRandomVector(int n);
-void printRealToStream(FILE *stream, cmatrix A);
-int cmpDouble(const void *pa, const void *pb);
-int cmpVectorElems(const void *pa, const void *pb);
-cmatrix sortVector (cmatrix A);
-void freeRowsCols (void *pA);
-double getError(cmatrix A, cmatrix B);
-cmatrix removeFrequencies (cmatrix s, double allowable_error);
+#define TRUE 1
+#define FALSE 0
+
 int main(int argc, char **argv);
+double getDFTFromArray(gsl_vector_complex *dest, gsl_vector_complex *source, int n_points, int n_frequencies);
+double timer();
 
 #endif
