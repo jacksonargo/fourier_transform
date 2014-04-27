@@ -98,21 +98,23 @@ int main(int argc, char **argv) {
     /* Make the discrete tranforms */
     for (i = 0; i < 4; i++) {
         //printf ("Transforming with %i frequencies.\n", 2*i+1);
-        time = getDFTFromArray(trans, raw, n_points, 2*i+1);
+        if (i == 0)
+            time = getDFTFromArray(trans, raw, n_points, 2*i+1, TRUE);
+        else
+            time = getDFTFromArray(trans, NULL, n_points, 2*i+1, TRUE);
         error = getRMSError(raw, trans, n_points);
         printf ("Got DFT with %i frequencies in %lf secs with error %e.\n", 2*i+1, time, error);
         printArray(dft_out[i], trans, n_points);
     }
 
-#ifdef DONOTCOMPILE
     /* Make the discrete time series */
     for (i = 0; i < 4; i++) {
-        time = getDTFTFromArray(trans, raw, n_points, 2*i+1);
+        time = getDFTFromArray(trans, NULL, n_points, 2*i+1, FALSE);
         error = getRMSError(raw, trans, n_points);
         printf ("Got DTFT with %i frequencies in %lf secs with error %e.\n", 2*i+1, time, error);
-        printArray(dtft_out, trans, n_points);
+        printArray(dtft_out[i], trans, n_points);
     }
-#endif
+    getDFTFromArray(NULL, NULL, n_points, 2*i+1, 0);
 
     /* Close all files and free memory */
     fclose(input);
