@@ -28,7 +28,7 @@ void makeInverseMatrix(gsl_matrix_complex *G, int n_points) {
     }
 }
 
-double getDFTFromArray(gsl_vector_complex *dest, gsl_vector_complex *source, int n_points, int n_frequencies, int max_freqs) {
+double getDFTFromArray(gsl_vector_complex *dest, gsl_vector_complex *source, gsl_vector_complex *romb, int n_points, int n_frequencies, int max_freqs) {
     static gsl_matrix_complex *F = NULL;
     static gsl_vector_complex *v = NULL, *u = NULL;
     static gsl_vector *m;
@@ -65,7 +65,10 @@ double getDFTFromArray(gsl_vector_complex *dest, gsl_vector_complex *source, int
         //gsl_matrix_complex_fprintf(stdout, F, "%e");
 
         //puts("Transforming the source");
-        gsl_blas_zgemv(CblasNoTrans, GSL_COMPLEX_ONE, F, source, GSL_COMPLEX_ZERO, v);
+        if (romb == NULL)
+            gsl_blas_zgemv(CblasNoTrans, GSL_COMPLEX_ONE, F, source, GSL_COMPLEX_ZERO, v);
+        else
+            gsl_blas_zgemv(CblasNoTrans, GSL_COMPLEX_ONE, F, romb, GSL_COMPLEX_ZERO, v);
         //gsl_vector_complex_fprintf(stdout, v, "%e");
 
         //puts("Making Inverse Fourier matrix.");
@@ -95,7 +98,7 @@ double getDFTFromArray(gsl_vector_complex *dest, gsl_vector_complex *source, int
     //puts("");gsl_vector_complex_fprintf(stdout, u, "%e");
 
     /* Remove frequencies */
-    //printf ("Removing frequencies.\n");
+    //printf ("Leaving %i frequencies.\n", n_frequencies);
     for (i = 0; i < n_points - n_frequencies; i++) {
         if (max_freqs)
             j = gsl_permutation_get (p, i);
@@ -107,6 +110,8 @@ double getDFTFromArray(gsl_vector_complex *dest, gsl_vector_complex *source, int
 
     /* Tranform back to time */
     //puts("Transforming back");
+    //if (romb != NULL)
+    //    gsl_vector_complex_mul(u, romb);
     gsl_blas_zgemv(CblasNoTrans, GSL_COMPLEX_ONE, F, u, GSL_COMPLEX_ZERO, dest);
 
     return timer();

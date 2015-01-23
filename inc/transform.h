@@ -26,5 +26,5 @@
 int main(int argc, char **argv);
 double timer();
 
-double getDFTFromArray(gsl_vector_complex *dest, gsl_vector_complex *source, int n_points, int n_frequencies, int maxed);
+double getDFTFromArray(gsl_vector_complex *dest, gsl_vector_complex *source, gsl_vector_complex *romb, int n_points, int n_frequencies, int maxed);
 #endif

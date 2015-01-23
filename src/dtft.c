@@ -1,8 +1,8 @@
 /* src/dtft.c */
 
+#ifdef DONOTCOMPILE
 #include "transform.h"
 
-#ifdef DONOTCOMPILE
 gsl_complex getSeriesCoeffs(gsl_vector_complex *v, gsl_maxtrix_complex *FOR, int n_points, int k) {
     int i;
     gsl_complex z, w, sum;
